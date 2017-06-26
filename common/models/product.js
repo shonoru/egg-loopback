@@ -1,6 +1,19 @@
 'use strict';
 
 module.exports = function(Product) {
+  Product.observe('before save', function(ctx, next) {
+    if (ctx.instance && ctx.instance.categoryId) {
+      return Product.app.models.Category
+        .count({ id: ctx.instance.categoryId })
+        .then(res => {
+          if (res < 1) {
+            return Promise.reject('Error adding product to non-existing category');
+          }
+        })
+    }
+
+    return next();
+  })
   /**
    * Return true is input is larger than zero
    * @param {number} quantity Number to validate
@@ -47,7 +60,7 @@ module.exports = function(Product) {
   function validateMinimalPrice(err, done) {
     const price = this.price;
 
-    process.nextTick(() => {
+    process.nextTick(() => {      
       const minimalPriceFromDB = 99;
       if (price < minimalPriceFromDB) {
         err();
@@ -55,10 +68,9 @@ module.exports = function(Product) {
 
       done();
     });
-
-    // FIXME doesn't work properly
-    Product.validateAsync('price', validateMinimalPrice, {
-      message: 'Price should be higher than the minimal price in the DB',
-    });
   }
+
+  Product.validateAsync('price', validateMinimalPrice, {
+    message: 'Price should be higher than the minimal price in the DB',
+  });
 };
